@@ -346,6 +346,48 @@ type OpenAIConfig struct {
 	BaseURL        string `yaml:"base_url" json:"base_url"`
 	Model          string `yaml:"model" json:"model"`
 	MaxTotalTokens int    `yaml:"max_total_tokens,omitempty" json:"max_total_tokens,omitempty"`
+	// Reasoning 控制 Eino ChatModel 的 thinking / reasoning_effort / output_config 等（仅 Eino 路径生效；原生 ReAct 忽略）。
+	Reasoning OpenAIReasoningConfig `yaml:"reasoning,omitempty" json:"reasoning,omitempty"`
+}
+
+// OpenAIReasoningConfig 全局默认与网关 profile（对话页可通过 ChatRequest.reasoning 覆盖，受 AllowClientReasoning 约束）。
+type OpenAIReasoningConfig struct {
+	// Mode: auto（默认）| on | off | default（与 auto 相同）。off 时不向模型附加推理扩展字段。
+	Mode string `yaml:"mode,omitempty" json:"mode,omitempty"`
+	// Effort: low | medium | high | max；空表示不单独指定强度（各 profile 行为见 internal/reasoning）。
+	Effort string `yaml:"effort,omitempty" json:"effort,omitempty"`
+	// AllowClientReasoning 为 false 时忽略请求体 reasoning；nil 或未设置等同于 true。
+	AllowClientReasoning *bool `yaml:"allow_client_reasoning,omitempty" json:"allow_client_reasoning,omitempty"`
+	// Profile: auto | deepseek_compat | openai_compat | output_config_effort
+	Profile string `yaml:"profile,omitempty" json:"profile,omitempty"`
+	// ExtraRequestFields 合并进 Chat Completions 根 JSON（管理员用；与自动字段同名时后者覆盖）。
+	ExtraRequestFields map[string]interface{} `yaml:"extra_request_fields,omitempty" json:"extra_request_fields,omitempty"`
+}
+
+// ModeEffective returns auto when empty or default.
+func (c OpenAIReasoningConfig) ModeEffective() string {
+	m := strings.ToLower(strings.TrimSpace(c.Mode))
+	if m == "" || m == "default" {
+		return "auto"
+	}
+	return m
+}
+
+// ProfileEffective returns auto when empty.
+func (c OpenAIReasoningConfig) ProfileEffective() string {
+	p := strings.ToLower(strings.TrimSpace(c.Profile))
+	if p == "" {
+		return "auto"
+	}
+	return p
+}
+
+// AllowClientReasoningEffective true when client may send ChatRequest.reasoning.
+func (c OpenAIReasoningConfig) AllowClientReasoningEffective() bool {
+	if c.AllowClientReasoning == nil {
+		return true
+	}
+	return *c.AllowClientReasoning
 }
 
 type FofaConfig struct {
